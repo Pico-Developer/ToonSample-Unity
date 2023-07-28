@@ -1,0 +1,1 @@
+Toon World is a performance optimization demonstration. It uses multiview rendering, application spacewarp, and late latching to balance the app's performance consumption while maintaining a high-quality rendering effect.

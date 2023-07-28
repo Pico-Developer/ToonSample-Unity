@@ -1,0 +1,97 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Terrain
+  m_Shader: {fileID: 4800000, guid: 6c336977d5a573a4cb94eb8e5bbc3c2e, type: 3}
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BlendMap:
+        m_Texture: {fileID: 2800000, guid: 0947c96eb53169848b2e74c97ad4bd6f, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Layer1_BaseColor:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Layer1_NormalMap:
+        m_Texture: {fileID: 2800000, guid: ae7e544929a557a48870fc079f232444, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Layer2_BaseColor:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Layer2_NormalMap:
+        m_Texture: {fileID: 2800000, guid: ae7e544929a557a48870fc079f232444, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Layer3_BaseColor:
+        m_Texture: {fileID: 2800000, guid: 9f524985db02fd142b963023d3260f8c, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Layer3_NormalMap:
+        m_Texture: {fileID: 2800000, guid: 13b3530c7143b0f469a39c5110e023be, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Noise:
+        m_Texture: {fileID: 2800000, guid: 6da826bcbe169a54b9d005b3658901fb, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_Lightmaps:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_LightmapsInd:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_ShadowMasks:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _AlphaCutoff: 0.5
+    - _FakeCloudPower: 1
+    - _FakeCloudScaleX: 0.5
+    - _FakeCloudScaleY: 0.5
+    - _FakeCloudSpeed: 0.2
+    - _FakeCloudStrength: 0.4
+    - _Float0: 0.5
+    - _Layer1_Normal_Intensity: 1
+    - _Layer1_Roughness: 1
+    - _Layer1_Tiling: 40
+    - _Layer2_Normal_Intensity: 1
+    - _Layer2_Roughness: 1
+    - _Layer2_Tiling: 20
+    - _Layer3_Normal_Intensity: 0.185
+    - _Layer3_Roughness: 1
+    - _Layer3_Tiling: 40
+    - _QueueControl: -1
+    - _QueueOffset: 0
+    - _U_Speed: -1
+    - _V_Speed: 0
+    - _WindRotation: 0.607
+    m_Colors:
+    - _EmissionColor: {r: 1, g: 1, b: 1, a: 1}
+    - _Layer1_Color: {r: 0.64097154, g: 0.7, b: 0.34313726, a: 1}
+    - _Layer2_Color: {r: 0.45294118, g: 0.55, b: 0.2660131, a: 1}
+    - _Layer3_Color: {r: 0.7, g: 0.6340314, b: 0.49842933, a: 1}
+    - _ShadowColorBottom: {r: 0.3882353, g: 0.3882353, b: 0.3882353, a: 0}
+    - _ShadowColorTop: {r: 1, g: 1, b: 1, a: 0}
+  m_BuildTextureStacks: []

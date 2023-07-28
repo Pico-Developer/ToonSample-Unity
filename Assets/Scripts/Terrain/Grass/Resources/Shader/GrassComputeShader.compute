@@ -1,0 +1,242 @@
+#include "Noise/Common.hlsl"
+#include "GrassData.cs.hlsl"
+#include "GrassComputeInput.hlsl"
+#include "GrassComputeCommMethod.hlsl"
+
+#pragma kernel CSMain
+
+AppendStructuredBuffer<GrassData> instanceData;
+
+// 索引计数、实例计数、起始索引位置、基本顶点位置和起始实例位置
+struct IndirectArgs {
+    uint indexCount;
+    uint instanceCount;
+    uint startIndex;
+    uint baseVertex;
+    uint startInstance;
+};
+RWStructuredBuffer<IndirectArgs> indirectArgsBuffer;
+
+#define threads_num 8
+
+
+[numthreads(threads_num,threads_num,1)]
+void CSMain (uint3 id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex)
+{
+    real dx = 13 * threads_num;
+    real dy = 13 * threads_num;
+
+    // 0 - 1
+    real2 r0 = rand2dTo2d(((id.x * dx + id.y) + _ChunkPosition.xz));
+    // -1 - 1
+    real2 r1 = r0 * 2 - 1;
+
+
+    real2 rcpXY = rcp(real2(dx, dy));
+
+    real chunkSize = _ChunkSize;
+    real2 chunkPosition = _ChunkPosition .xz;
+    
+    
+    real2 p = id.xy * rcpXY * chunkSize - 0.5 * chunkSize;
+    
+    p += r1 * chunkSize;
+    p += chunkPosition;
+    real2 minChunk = (chunkPosition - chunkSize * 0.5);
+    real2 maxChunk = (chunkPosition + chunkSize * 0.5);
+    p.x -= chunkSize * step(maxChunk.x, p.x);
+    p.x += chunkSize * step(p.x, minChunk.x);
+    p.y -= chunkSize * step(maxChunk.y, p.y);
+    p.y += chunkSize * step(p.y, minChunk.y);
+
+    // 计算平面相对应的位置
+    real2 positionOffset = p;
+    
+    // 通过最终的position计算出相对manage的uv信息进行采样
+    real2 uv = positionOffset / _GrassManageSize;
+
+    // 草在水平上面上的世界坐标
+    real2 horizontalPositionWS = mul(localToWorldMatrix, real4(positionOffset.x, 0, positionOffset.y, 1)).xz;
+    // 摄像机在水平面上的世界坐标
+    real2 horizontalCameraWS = cameraPositionWS.xz;
+    // 水平面上, 草距离摄像机上的距离差
+    real horizontalDistance = length(horizontalPositionWS - horizontalCameraWS);
+
+    real densityDrop = saturate(1.0 - (horizontalDistance / _MaxDisplayRange));
+    densityDrop = pow(densityDrop, 1.5);
+    densityDrop = densityDrop - r0.x;
+    if(densityDrop < 0) return;
+
+    // 防止突变, 0-0.1的部分进行缩放到0-1
+    real scale = saturate(densityDrop  * 10);
+
+
+    
+    // mask 贴图裁剪
+    // real mask = SampleMapWithPoint(GrassMaskMap, uv, GrassMaskMap_TexelSize).x;
+    real4 grassData = SampleMapWithLinear(GrassDataMap, samplerGrassDataMap, uv);
+    real mask = grassData.x;
+    real shadowMask = grassData.y;
+    real heightData = grassData.z;
+    real widthData = grassData.w;
+
+    mask = lerp(1, mask, grassNullParam);
+    shadowMask = lerp(1, shadowMask, grassNullParam);
+    heightData = lerp(1, heightData, grassNullParam);
+    
+    
+    scale *= smoothstep(min(_MaskClip, 0.99), 1, mask);
+    shadowMask = lerp(1, shadowMask, _ShadowMaskStrength);
+
+    
+
+    // 计算对应的高度信息
+    // real4 height = SampleMapWithPoint(GrassHeightMap, uv, GrassHeightMapTexelSize);
+    real2 heightMapUV = uv;
+    // heightMapUV.y = 1 - heightMapUV.y;
+
+    // R通道 线性采样
+    // real positionY = SampleMapWithLinear(GrassHeightMap, samplerGrassHeightMap, heightMapUV).x;
+    // R通道 点采样
+    // real positionY = SampleMapWithPoint(GrassHeightMap, heightMapUV, GrassHeightMapTexelSize).x;
+    // RG双通道采样
+    real positionY = SampleLinearWithRG(TerrainHeightNormalMap, samplerTerrainHeightNormalMap, heightMapUV, GrassHeightMapTexelSize);
+    real3 position = real3(positionOffset.x, positionY * _MaxHeightMap, positionOffset.y);
+    
+    /////////////////////////////////////////
+    /// 计算朝向 n米以内为随机, n米以外为广告牌  ///
+    /////////////////////////////////////////
+    
+    ///// 广告牌方向
+    real3 rootWS = mul(localToWorldMatrix, real4(position, 1)).xyz;
+    real2 viewRootDir = normalize(cameraPositionWS.xz - rootWS.xz);
+    ///// 随机方向
+    real2 randDir = normalize(r1);
+
+    // 草和摄像机之间距离
+    real diffDistance = length(cameraPositionWS.xz - rootWS.xz);
+    // 草的位置和摄像机的距离
+    real maxDiffDistance = 5;
+    real diffDistanceMin = min(maxDiffDistance, length(cameraPositionWS.xz - rootWS.xz));
+
+    real2 facing = normalize(lerp(randDir, viewRootDir, saturate(diffDistanceMin / maxDiffDistance)));
+    // facing = randDir;
+
+    /////////////////////////////////////////
+    /// Wind                              ///
+    /////////////////////////////////////////
+
+    real3 windDir = real3(0, 0, 1);
+    real3 randWindDir = real3(0, 0, 1);
+    Rotation(randWindDir, r0.x * TWO_PI);
+    Rotation(windDir, _WindRotation * TWO_PI);
+    real3 finalWindDir = normalize(lerp(windDir, randWindDir, _WindSplit)) * _WindStrength * 0.1;
+
+    // 风影响倾斜, 最大倾斜范围为 PI/2 : 90°, 但是风一般不会影响超过 45°
+    real tilt = saturate(lerp(0, 0.5, saturate((_WindStrength - 1) / 9) * _WindOfTilt));
+    
+    
+    
+    /////////////////////////////////////////
+    /// 假影子                             ///
+    /////////////////////////////////////////
+    real2 fakeShadowUV = uv * real2(_FakeCloudScaleX, _FakeCloudScaleY);
+    fakeShadowUV = fakeShadowUV + _Time.x * _FakeCloudSpeed * -windDir.xz;
+    real fakeShadow = SampleMapWithLinear(FakeCloudShadowMap, samplerFakeCloudShadowMap, fakeShadowUV).x;
+    fakeShadow = pow(abs(fakeShadow), _FakeCloudPower);
+    fakeShadow *= _FakeCloudStrength;//lerp(1, fakeShadow, _FakeCloudStrength);
+    
+    /////////////////////////////////////////
+    /// 草浪                               ///
+    /////////////////////////////////////////
+    real2 grassWaveUV = uv * real2(_GrassWaveScaleX, _GrassWaveScaleY);
+    grassWaveUV = grassWaveUV + _Time.x * _GrassWaveSpeed * -windDir.xz;
+    real grassWave = SampleMapWithLinear(GrassWaveMap, samplerGrassWaveMap, grassWaveUV).x;
+    grassWave = pow(abs(grassWave), _GrassWavePower);
+    grassWave *= _GrassWaveStrength;//lerp(1, grassWave, _GrassWaveStrength);
+
+
+    // 法线相关的信息
+    real2 normalPackage = SampleMapWithLinear(TerrainHeightNormalMap, samplerTerrainHeightNormalMap, heightMapUV).zw;
+    real3 normalOS;
+    
+    normalOS.xy = normalPackage.xy * 2.0 - 1.0;
+    normalOS.z = max(1.0e-16, sqrt(1.0 - saturate(dot(normalOS.xy, normalOS.xy))));
+
+    real3 tangent = real3(1, 0, 0);
+    tangent = mul((real3x3)localToWorldMatrix, tangent);
+    real3 normal = real3(0, 1, 0);
+    normal = mul(normal, (real3x3)worldToLocalMatrix);
+    // const real3 bitangent = normalize(cross(normal, tangent));
+    const real3 bitangent = normalize(cross(tangent, normal));
+    const real3x3 tbn = real3x3(tangent, bitangent, normal);
+    normalOS = mul(normalOS, tbn);
+
+    // 计算lambert相关
+    const real3 mainLightDir = _MainLightPosition.xyz;
+    real lambert = max(0, dot(mainLightDir, normalOS));
+    lambert = lerp(1, lambert, _GrassLambertStrength);
+
+    // 控制斜坡裁剪
+    real slopeClipDot = dot(normalOS, real3(0, 1, 0));
+    // scale *= smoothstep(min(_SlopeClip, 0.99), 1, slopeClipDot);
+    scale *= lerp(1, smoothstep(min(_SlopeClip, 0.99), 1, slopeClipDot), _SlopeClip);
+
+    GrassData data = (GrassData) 0;
+    data.Position = rootWS.xyz;
+    data.Facing = facing;
+    data.Wind = finalWindDir.xz;
+    data.Tilt = tilt;
+    data.Height = (0.4 + (r1.x * 0.5 + 0.5) * 0.5) * heightData;
+    data.Height *= scale;
+    data.FakeShadow = fakeShadow;
+    data.Wave = grassWave;
+    data.Lambert = lambert;
+    data.ShadowMask = shadowMask;
+    // data.Normal = normalOS;
+
+    data.PerBladeHash = r0.x;
+    
+    if(data.Height <= 0)
+    {
+        return;
+    }
+
+    real3 topPoint = float3(0, 1, 0);
+    topPoint.xz += normalize(data.Wind) * data.Tilt;
+    if(
+        FrustumTestOS(position)
+        && FrustumTestOS(position + topPoint)
+        )
+    {
+        return;
+    }
+
+    data.Width = 0.2;
+
+    /////////////////////////////////////////
+    ///          越远的草可以更宽一点         ///
+    /////////////////////////////////////////
+    /// 最小倍率, 最大倍率, 最远距离=最远密度
+    real minWidthMultiplier = 1;
+    real maxWidthMultiplier = 5;
+    real maxWidthDistance = _MaxDisplayRange;
+    data.Width *= lerp(minWidthMultiplier, maxWidthMultiplier, saturate(diffDistance / maxWidthDistance));
+
+    
+    
+    data.Height *= _GrassHeight;// * ((mask - _MaskClip)/max((1 - _MaskClip), 0.001));
+    data.Width *= _GrassWidth;
+
+    data.Width *= widthData;
+
+    
+    /*
+     * https://learn.microsoft.com/zh-cn/windows/win32/direct3dhlsl/interlockedadd
+     * 给 instanceCount 计数 + 1
+     * 对 dest 资源变量执行有保证的原子值添加。
+     */
+    InterlockedAdd(indirectArgsBuffer[0].instanceCount, 1);
+    
+    instanceData.Append(data);
+}
