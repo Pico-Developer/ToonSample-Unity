@@ -26,7 +26,7 @@ Toon World is a performance optimization demonstration. It uses multiview render
 | Graphics API | Vulkan |
 
 ## Performance stats 
-|  | Before | Before |
+|  | Before | After |
 | --- | --- | --- |
 | FPS | 72 | 36 |
 | Grass Density Level| Low | High |
